@@ -11,13 +11,13 @@ import { useChangeLanguage } from "remix-i18next/react";
 export const links: LinksFunction = () => [{ rel: "stylesheet", href: stylesheet }];
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  let locale = await i18next.getLocale(request);
+  const locale = await i18next.getLocale(request);
   return json({ locale }, { headers: { "Set-Cookie": await i18nCookie.serialize(locale) } });
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
-  let { locale } = useLoaderData<typeof loader>();
-  let { i18n } = useTranslation();
+  const { locale } = useLoaderData<typeof loader>();
+  const { i18n } = useTranslation();
   useChangeLanguage(locale);
   return (
     <html lang={locale} dir={i18n.dir()}>

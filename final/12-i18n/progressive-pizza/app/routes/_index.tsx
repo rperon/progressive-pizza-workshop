@@ -41,7 +41,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export default function Index() {
   const actionData = useActionData<typeof action>();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   // Add state management for the pizza preview
   const [toppings, setToppings] = useState<string[]>([]);
 
