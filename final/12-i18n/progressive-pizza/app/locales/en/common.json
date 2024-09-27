@@ -1,0 +1,19 @@
+{
+  "confirmation": {
+    "newOrder": "Start a new order",
+    "order": "Order n° {{orderId}}",
+    "ready": "When your pizza is ready, you will be notified.",
+    "thanks": "Thanks for your order"
+  },
+  "error": {
+    "sorry": "we are sorry"
+  },
+  "large": "Large",
+  "medium": "Medium",
+  "order": "Order",
+  "selectPizzaSize": "Select pizza size",
+  "selectSize": "Select size",
+  "selectToppings": "Select toppings",
+  "small": "Small",
+  "title": "Remix your pizza"
+}

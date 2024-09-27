@@ -1,5 +1,6 @@
 import { LoaderFunctionArgs } from "@remix-run/node";
 import { Link, useLoaderData, useRouteError } from "@remix-run/react";
+import { useTranslation } from "react-i18next";
 import { Button } from "~/components/ui/Button";
 import { Layout } from "~/components/ui/Layout";
 import { Message } from "~/components/ui/Message";
@@ -17,21 +18,21 @@ export function loader({ request }: LoaderFunctionArgs) {
 
 export default function Confirmation() {
   const { orderId } = useLoaderData<typeof loader>();
+  const { t } = useTranslation();
 
   return (
     <Layout center>
       <Message
-        title="Merci pour votre commande"
-        subtitle={`Commande n° ${orderId}`}
+        title={t("confirmation.thanks")}
+        subtitle={t("confirmation.order", { orderId })}
         imageUrl="/sizes/medium.svg"
         actions={
           <Button as={Link} to="/">
-            Lancer une nouvelle commande
+            {t("confirmation.newOrder")}
           </Button>
         }
       >
-        Votre pizza sera prête dans quelques minutes. Vous serez notifié une
-        fois que c&apos;est pr&ecirc;t.
+        {t("confirmation.ready")}
       </Message>
     </Layout>
   );
@@ -39,14 +40,11 @@ export default function Confirmation() {
 
 export function ErrorBoundary() {
   const error = useRouteError();
+  const { t } = useTranslation();
   console.error(error);
   return (
     <Layout center>
-      <Message
-        title="Nous sommes désolé"
-        subtitle="Numéro de commande invalide"
-        imageUrl="/sizes/medium.svg"
-      >
+      <Message title={t("error.sorry")} subtitle="Numéro de commande invalide" imageUrl="/sizes/medium.svg">
         Veuillez repasser votre commande.
       </Message>
     </Layout>
