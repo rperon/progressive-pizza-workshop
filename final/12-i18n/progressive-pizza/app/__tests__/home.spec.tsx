@@ -5,7 +5,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { I18nextProvider, initReactI18next } from "react-i18next";
 import i18next from "i18next";
-import * as i18n from "../i18n";
+import { i18nConfig } from "~/i18n";
 
 const App = createRemixStub([
   {
@@ -24,7 +24,7 @@ const App = createRemixStub([
 test("rendering the order page", async () => {
   render(<App initialEntries={["/"]} initialIndex={0} />, {
     wrapper: ({ children }) => {
-      i18next.use(initReactI18next).init({ ...i18n });
+      i18next.use(initReactI18next).init({ ...i18nConfig });
       return <I18nextProvider i18n={i18next}>{children}</I18nextProvider>;
     },
   });

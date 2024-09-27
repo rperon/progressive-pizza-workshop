@@ -14,7 +14,8 @@ import { renderToPipeableStream } from "react-dom/server";
 import { createInstance } from "i18next";
 import i18next from "./i18next.server";
 import { I18nextProvider, initReactI18next } from "react-i18next";
-import * as i18n from "./i18n";
+import { i18nConfig } from "./i18n";
+// import * as i18n from "./i18n";
 
 const ABORT_DELAY = 5_000;
 
@@ -90,7 +91,7 @@ async function handleBrowserRequest(
   let ns = i18next.getRouteNamespaces(remixContext);
 
   await instance.use(initReactI18next).init({
-    ...i18n,
+    ...i18nConfig,
     lng,
     ns,
   });
