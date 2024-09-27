@@ -2,6 +2,7 @@ import { createRemixStub } from "@remix-run/testing";
 import { default as Component, action } from "~/routes/_index";
 import { expect, test } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 const App = createRemixStub([
   {
@@ -25,14 +26,15 @@ test("rendering the order page", async () => {
 
 test("ordering a pizza", async () => {
   render(<App initialEntries={["/"]} initialIndex={0} />);
+  const user = userEvent.setup();
 
   const mediumPizzaRadio = await screen.findByRole("radio", {
     name: /medium/i,
   });
-  mediumPizzaRadio.click();
+  await user.click(mediumPizzaRadio);
 
   const orderButtons = await screen.findAllByRole("button");
-  orderButtons[0].click();
+  await user.click(orderButtons[0]);
 
   expect(await screen.findByText("Confirmation")).toBeInTheDocument();
 });
