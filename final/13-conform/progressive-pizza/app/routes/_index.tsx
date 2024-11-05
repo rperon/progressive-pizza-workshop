@@ -1,5 +1,5 @@
 import { redirect, type ActionFunctionArgs, type MetaFunction } from "@remix-run/node";
-import { Form, useActionData } from "@remix-run/react";
+import { Form, useActionData, useNavigation } from "@remix-run/react";
 import { ChangeEvent, useState } from "react";
 import { PizzaPreview } from "~/components/PizzaPreview";
 import { Button } from "~/components/ui/Button";
@@ -9,6 +9,10 @@ import { Grid } from "~/components/ui/Grid";
 import { Layout } from "~/components/ui/Layout";
 import { Radio } from "~/components/ui/Radio";
 import { Text } from "~/components/ui/Text";
+import { z } from "zod";
+import { getZodConstraint, parseWithZod } from "@conform-to/zod";
+import { getFormProps, getInputProps, useForm } from "@conform-to/react";
+import { setTimeout } from "node:timers/promises";
 
 export const meta: MetaFunction = () => {
   return [{ title: "New Remix App" }, { name: "description", content: "Welcome to Remix!" }];
@@ -16,53 +20,70 @@ export const meta: MetaFunction = () => {
 
 let nextOrderId = 0;
 
-type FormErrorObject = { size?: string; firstname?: string; lastname?: string; email?: string; phone?: string };
+const pizzaToppings = [
+  "anchovy",
+  "bacon",
+  "basil",
+  "chili",
+  "mozzarella",
+  "mushroom",
+  "olive",
+  "onion",
+  "pepper",
+  "pepperoni",
+  "sweetcorn",
+  "tomato",
+] as const;
+
+const pizzaSize = ["small", "medium", "large"] as const;
+
+const schema = z.object({
+  size: z.enum(pizzaSize, {
+    required_error: "Veuillez selectionnez la taille de votre pizza",
+    message: "Veuillez selectionnez une taille de pizza valide",
+  }),
+  toppings: z.array(z.enum(pizzaToppings)),
+  firstname: z
+    .string({ required_error: "Veuillez entrer votre prénom" })
+    .min(0, "Votre prénom doit contenir au moins 2 caractères"),
+  lastname: z
+    .string({ required_error: "Veuillez entrer votre nom" })
+    .min(2, "Votre nom doit contenir au moins 2 caractères"),
+  email: z
+    .string({ required_error: "Veuillez entrer une adresse email valide" })
+    .email("Veuillez entrer une adresse email valide")
+    .refine(
+      (email) => {
+        return !email.endsWith("@example.com");
+      },
+      { message: "User email is not allowed" }
+    ),
+  phone: z.string({ required_error: "Veuillez entrer votre numéro de téléphone" }),
+});
 
 export async function action({ request }: ActionFunctionArgs) {
   const form = await request.formData();
-  const size = form.get("size");
-  const toppings = form.getAll("toppings");
-  const firstname = form.get("firstname");
-  const lastname = form.get("lastname");
-  const email = form.get("email");
-  const phone = form.get("phone");
 
-  let errors: FormErrorObject = {};
+  const submission = await parseWithZod(form, {
+    schema: schema.superRefine(async ({ email }, ctx) => {
+      if (email.endsWith("@slow.com")) {
+        await setTimeout(3000);
+        return ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "User email is too slow",
+          path: ["email"],
+        });
+      }
+    }),
+    async: true,
+  });
 
-  // form validation
-  if (!size) {
-    errors = { ...errors, size: "Veuillez selectionnez la taille de votre pizza" };
-  }
-  if (firstname === "") {
-    errors = { ...errors, firstname: "Veuillez entrer votre prénom" };
-  } else if (firstname !== null && typeof firstname === "string") {
-    if (firstname.length < 2) {
-      errors = { ...errors, firstname: "Votre prénom doit contenir au moins 2 caractères" };
-    }
-  }
-
-  if (lastname === "") {
-    errors = { ...errors, lastname: "Veuillez entrer votre nom" };
-  } else if (lastname !== null && typeof lastname === "string") {
-    if (lastname.length < 2) {
-      errors = { ...errors, lastname: "Votre nom doit contenir au moins 2 caractères" };
-    }
-  }
-  if (email === "") {
-    errors = { ...errors, email: "Veuillez entrer votre email" };
-  } else if (email !== null && typeof email === "string") {
-    if (email.endsWith("@example.com")) {
-      errors = { ...errors, email: "Veuillez entrer une adresse email valide" };
-    }
-  }
-  if (phone === "") {
-    errors = { ...errors, phone: "Veuillez entrer votre numéro de téléphone" };
+  if (submission.status !== "success") {
+    console.error(submission.error);
+    return submission.reply();
   }
 
-  if (Object.keys(errors).length > 0) {
-    return { errors };
-  }
-
+  const { size, toppings, firstname, lastname, email, phone } = submission.value;
   const orderId = nextOrderId++;
   console.log(
     `[order #${orderId}] Ordering a ${size} pizza` +
@@ -76,6 +97,19 @@ export default function Index() {
   const actionData = useActionData<typeof action>();
   // Add state management for the pizza preview
   const [toppings, setToppings] = useState<string[]>([]);
+  const navigation = useNavigation();
+
+  const [form, fields] = useForm({
+    id: "pizza-form",
+    lastResult: actionData,
+    constraint: getZodConstraint(schema),
+    onValidate: ({ formData }) => {
+      return parseWithZod(formData, { schema });
+    },
+    shouldValidate: "onBlur",
+    shouldRevalidate: "onInput",
+    defaultValue: {},
+  });
 
   const handleFormChange = (event: ChangeEvent<HTMLFormElement>) => {
     const formData = new FormData(event.currentTarget);
@@ -84,7 +118,7 @@ export default function Index() {
   };
 
   const inputClasses =
-    "mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm shadow-sm placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500  disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-200 disabled:shadow-none  invalid:border-pink-500 invalid:text-pink-600      focus:invalid:border-pink-500 focus:invalid:ring-pink-500";
+    "mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md text-sm shadow-sm placeholder-slate-400 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500  disabled:bg-slate-50 disabled:text-slate-500 disabled:border-slate-200 disabled:shadow-none  aria-[invalid]:border-pink-500 aria-[invalid]:text-pink-600 focus:aria-[invalid]:border-pink-500 focus:aria-[invalid]:ring-pink-500";
 
   return (
     <Layout
@@ -102,7 +136,7 @@ export default function Index() {
       <PizzaPreview toppings={toppings} />
 
       <Form
-        id="pizza-form"
+        {...getFormProps(form)}
         method="POST"
         action="?index"
         onChange={handleFormChange} // update the pizza preview on every form change
@@ -113,22 +147,20 @@ export default function Index() {
           </Text>
 
           <Flex>
-            <Radio type="radio" name="size" value="small" imageUrl="/sizes/small.svg">
-              Small
-            </Radio>
-
-            <Radio type="radio" name="size" value="medium" imageUrl="/sizes/medium.svg">
-              Medium
-            </Radio>
-
-            <Radio type="radio" name="size" value="large" imageUrl="/sizes/large.svg">
-              Large
-            </Radio>
+            {pizzaSize.map((size) => (
+              <Radio
+                {...getInputProps(fields.size, { type: "radio" })}
+                key={size}
+                value={size}
+                imageUrl={`/sizes/${size}.svg`}
+              >
+                <span className="capitalize">{size}</span>
+              </Radio>
+            ))}
           </Flex>
-
-          {actionData?.errors?.size && (
+          {fields.size.errors && (
             <Text size="sm" color="danger">
-              <em>{actionData?.errors?.size}</em>
+              <em>{fields.size.errors.join(", ")}</em>
             </Text>
           )}
         </fieldset>
@@ -137,56 +169,23 @@ export default function Index() {
           <Text className="mb-4" as="legend" size="lg" weight="bold">
             Choisissez votre garniture
           </Text>
-
           <Grid>
-            <Checkbox name="toppings" value="anchovy" imageUrl="/toppings/anchovy.svg">
-              Anchois
-            </Checkbox>
-
-            <Checkbox name="toppings" value="bacon" imageUrl="/toppings/bacon.svg">
-              Bacon
-            </Checkbox>
-
-            <Checkbox name="toppings" value="basil" imageUrl="/toppings/basil.svg">
-              Basilic
-            </Checkbox>
-
-            <Checkbox name="toppings" value="chili" imageUrl="/toppings/chili.svg">
-              Piment
-            </Checkbox>
-
-            <Checkbox name="toppings" value="mozzarella" imageUrl="/toppings/mozzarella.svg">
-              Mozzarella
-            </Checkbox>
-
-            <Checkbox name="toppings" value="mushroom" imageUrl="/toppings/mushroom.svg">
-              Champignon
-            </Checkbox>
-
-            <Checkbox name="toppings" value="olive" imageUrl="/toppings/olive.svg">
-              Olive
-            </Checkbox>
-
-            <Checkbox name="toppings" value="onion" imageUrl="/toppings/onion.svg">
-              Oignon
-            </Checkbox>
-
-            <Checkbox name="toppings" value="pepper" imageUrl="/toppings/pepper.svg">
-              Poivre
-            </Checkbox>
-
-            <Checkbox name="toppings" value="pepperoni" imageUrl="/toppings/pepperoni.svg">
-              Pepperoni
-            </Checkbox>
-
-            <Checkbox name="toppings" value="sweetcorn" imageUrl="/toppings/sweetcorn.svg">
-              Maïs
-            </Checkbox>
-
-            <Checkbox name="toppings" value="tomato" imageUrl="/toppings/tomato.svg">
-              Tomate
-            </Checkbox>
+            {pizzaToppings.map((topping) => (
+              <Checkbox
+                {...getInputProps(fields.toppings, { type: "checkbox" })}
+                key={topping}
+                value={topping}
+                imageUrl={`/toppings/${topping}.svg`}
+              >
+                <span className="capitalize">{topping}</span>
+              </Checkbox>
+            ))}
           </Grid>
+          {fields.toppings.errors && (
+            <Text size="sm" color="danger">
+              <em>{fields.toppings.errors.join(", ")}</em>
+            </Text>
+          )}
         </fieldset>
 
         <fieldset className="my-4">
@@ -195,54 +194,81 @@ export default function Index() {
           </Text>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label htmlFor="firstname">
+              <label htmlFor={fields.firstname.id}>
                 <span className="block text-sm font-medium text-slate-700">Prénom</span>
               </label>
-              <input id="firstname" type="text" name="firstname" className={inputClasses} />
-              {actionData?.errors?.firstname && (
+              <input
+                {...getInputProps(fields.firstname, { type: "text" })}
+                key={fields.firstname.key}
+                className={inputClasses}
+              />
+              {fields.firstname.errors && (
                 <Text size="sm" color="danger">
-                  <em>{actionData?.errors?.firstname}</em>
+                  <em>{fields.firstname.errors.join(", ")}</em>
                 </Text>
               )}
             </div>
             <div>
-              <label htmlFor="lastname">
+              <label htmlFor={fields.lastname.id}>
                 <span className="block text-sm font-medium text-slate-700">Nom</span>
               </label>
-              <input id="lastname" type="text" name="lastname" className={inputClasses} />
-              {actionData?.errors?.lastname && (
+              <input
+                {...getInputProps(fields.lastname, { type: "text" })}
+                key={fields.lastname.key}
+                className={inputClasses}
+              />
+
+              {fields.lastname.errors && (
                 <Text size="sm" color="danger">
-                  <em>{actionData?.errors?.lastname}</em>
+                  <em>{fields.lastname.errors.join(", ")}</em>
                 </Text>
               )}
             </div>
             <div>
-              <label htmlFor="email">
+              <label htmlFor={fields.email.id}>
                 <span className="block text-sm font-medium text-slate-700">Email</span>
               </label>
-              <input id="email" type="email" name="email" className={inputClasses} />
-              {actionData?.errors?.email && (
+              <input
+                {...getInputProps(fields.email, { type: "email" })}
+                key={fields.email.key}
+                className={inputClasses}
+              />
+              {fields.email.errors && (
                 <Text size="sm" color="danger">
-                  <em>{actionData?.errors?.email}</em>
+                  <em>{fields.email.errors.join(", ")}</em>
                 </Text>
               )}
             </div>
             <div>
-              <label htmlFor="phone">
+              <label htmlFor={fields.phone.id}>
                 <span className="block text-sm font-medium text-slate-700">Téléphone</span>
               </label>
-              <input id="phone" type="tel" name="phone" className={inputClasses} />
-              {actionData?.errors?.phone && (
+              <input
+                {...getInputProps(fields.phone, { type: "tel" })}
+                key={fields.phone.key}
+                className={inputClasses}
+              />
+              {fields.phone.errors && (
                 <Text size="sm" color="danger">
-                  <em>{actionData?.errors?.phone}</em>
+                  <em>{fields.phone.errors.join(", ")}</em>
                 </Text>
               )}
             </div>
           </div>
         </fieldset>
-        <Button className="hidden md:inline-block" type="submit">
-          Commander
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            className="hidden md:inline-block disabled:bg-orange-200"
+            type="submit"
+            disabled={navigation.state === "submitting"}
+          >
+            Commander
+            {navigation.state === "submitting" && <span className="ml-2 animate-pulse">🍕</span>}
+          </Button>
+          <Button className="hidden md:inline-block" type="reset">
+            Reset
+          </Button>
+        </div>
       </Form>
     </Layout>
   );
